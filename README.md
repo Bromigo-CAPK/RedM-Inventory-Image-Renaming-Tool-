@@ -32,7 +32,7 @@ Run the Tool:
     
 	* Select the Exported SQL File
     
-	* Select the root folder containg both copies of the images
+	* Select the root folder containg both Image folders
     
 	* Select Filters
     

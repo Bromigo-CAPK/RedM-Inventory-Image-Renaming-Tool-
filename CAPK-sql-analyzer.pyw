@@ -1,4 +1,63 @@
-# ---- Bromigo-CAPK@github ----
+"""
+        ============================================================
+        RATBAG DEV 2025                              SK-CAPK.DEV
+        ------------------------------------------------------------
+        Ratbags SQL-Image Rename Tool 
+        Version:       1.01
+        Released:      18/12/2025
+        Last Update:   20/12/2025
+
+        Author:        Bromigo-CAPK@github
+        Contributions: Bromigo-CAPK@github
+        ============================================================
+
+        This tool compares an SQL data file against image files and
+        displays results for easy searching and renaming of images.
+
+        This Current version is for RedM, but theres no reason
+        why it couldnt be adapted for FiveM or any other 
+        database-driven systems.
+
+        This project is intended as an opensource template.
+        Feel free to modify, extend, or add custom filters.
+
+        FEATURES:
+            • Recursive image scanning
+            • Analysis filters
+            • Item name & description display
+            • Match detection & suggestions
+            • Search bar
+            • Batch rename after confirmation
+            • Duplicate cleanup after rename
+            • Image preview on hover
+
+        HOW TO USE:
+            1. Export your item database to SQL
+            
+            2. Create a root folder
+                - Place the SQL file inside
+                - Create two subfolders for images
+
+            3. Copy:
+                - Images to keep → Folder A
+                - New image set  → Folder B
+    
+            4. Run the app
+                - Select SQL file
+                - Select root image folder
+                - Adjust filters
+                - Run analysis
+                - Review results
+                - Rename as needed
+
+            5. A BACKUP folder is created automatically
+                - Previous matches are stored
+                - Old backups and copied files are deleted
+                
+        SETTINGS:
+            Only what ive added below if you look hard enuff.
+"""
+
 
 import os
 import re
@@ -46,7 +105,7 @@ def analyze(sql_items, image_folder):
 
 # ---------- GUI Setup ----------
 root = tk.Tk()
-root.title("SK-CAPK - RedM SQL vs Image Folder Analyzer")
+root.title("SQL vs Image File Analyzer")
 root.geometry("1500x700")
 
 current_img_folder = ""
@@ -618,107 +677,115 @@ extra_btn_frame = ttk.Frame(extra_images_tab)
 extra_btn_frame.pack(fill="x", padx=10, pady=10)
 ttk.Button(extra_btn_frame, text="Delete Selected", command=lambda: delete_extra_images()).pack(side="left", padx=5)
 
+# ---------- Counter ----------
+counter_var = tk.StringVar(value="")
+counter_label = ttk.Label(analyzer_tab, textvariable=counter_var)
+counter_label.pack(anchor="w", padx=10, pady=(0, 5))
+
 # ---------- Run Analysis ----------
 def run_analysis():
     global current_img_folder, image_files_all, image_map, selected_rows, extra_selected_rows
+
     sql_file = sql_path_var.get()
     img_folder = img_folder_var.get()
     if not os.path.isfile(sql_file) or not os.path.isdir(img_folder):
-        messagebox.showwarning("Missing info","Please select SQL file and image folder.")
+        messagebox.showwarning("Missing info", "Please select SQL file and image folder.")
         return
+
     current_img_folder = img_folder
     sql_items, descriptions = parse_sql_items(sql_file)
-    matched, missing, extra, image_files_all, image_map = analyze(sql_items,img_folder)
-    
+    matched, missing, extra, image_files_all, image_map = analyze(sql_items, img_folder)
+
     selected_rows.clear()
     extra_selected_rows.clear()
     for row in tree.get_children():
         tree.delete(row)
     for row in extra_tree.get_children():
         extra_tree.delete(row)
-    
-    # NEW LOGIC START: 1. Identify and "claim" images that are an exact match.
+
+    # ---------- COUNTER INIT ----------
+    total = len(matched) + len(missing)
+    done = 0
+    counter_var.set(f"Building results… 0/{total}")
+    root.update_idletasks()
+    # ---------------------------------
+
     claimed_images_lower = set()
 
-    # Process matched items
+    # ---------- MATCHED ----------
     for i in matched:
-        # The 'matched' list contains SQL items whose lowercased name 
-        # is found in the lowercased image file names.
-        
         i_lower = i.lower()
         if i_lower in image_map:
-             # Claim the image name for this exact match
-             claimed_images_lower.add(i_lower)
-             
-        suggestions, match_reasons = suggest_match(i, image_files_all)
+            claimed_images_lower.add(i_lower)
+
         status = "Exact match"
-        
-        # Check if it's actually a filtered match (e.g., ignoring _/-)
         reasons = []
         if ignore_underscore_var.get() and ("_" in i or "-" in i):
-             # Need to find the image that matched i.lower()
-             # We can't rely on 'i' here, we have to check the image_map
-             matching_image_name = i
-             for img_name_lower, path in image_map.items():
-                 if normalize_name(i).lower() == normalize_name(img_name_lower).lower():
-                    # This check is just for status reporting for the match
+            for img_name_lower in image_map:
+                if normalize_name(i).lower() == normalize_name(img_name_lower).lower():
                     reasons.append("ignore _/-")
                     break
 
         if reasons:
             status = f"Matched: {', '.join(reasons)}"
-        
-        # --- MODIFIED INSERTION ORDER FOR MATCHED ITEMS ---
+
         tree.insert("", "end", values=(
-            status,                             # [0] Status
-            descriptions.get(i,""),             # [1] Description
-            i,                                  # [2] Item
-            "",                                 # [3] Search (Empty)
-            i,                                  # [4] Suggestions (The exact match)
-            ""                                  # [5] Select (Empty)
+            status,
+            descriptions.get(i, ""),
+            i,
+            "",
+            i,
+            ""
         ), tags=("ok",))
-    
-    # NEW LOGIC END: 2. Filter the pool of images for suggestions
+
+        done += 1
+        counter_var.set(f"Building results… {done}/{total}")
+        root.update_idletasks()
+
+    # ---------- MISSING ----------
     available_images_for_suggestion = [
-        img for img in image_files_all 
+        img for img in image_files_all
         if img.lower() not in claimed_images_lower
     ]
 
-    # Process missing items - Now using the filtered list
     for i in missing:
-        # Only suggest from images not claimed by an exact match
         suggestions, match_reasons = suggest_match(i, available_images_for_suggestion)
-        
+
         best_match = suggestions[0] if suggestions else "None"
         if best_match != "None" and best_match in match_reasons:
-            reasons = ", ".join(match_reasons[best_match])
-            status = f"Suggested: {reasons}"
+            status = f"Suggested: {', '.join(match_reasons[best_match])}"
         else:
             status = "Missing Image"
-        
-        # --- MODIFIED INSERTION ORDER FOR MISSING ITEMS ---
+
         tree.insert("", "end", values=(
-            status,                             # [0] Status
-            descriptions.get(i,""),             # [1] Description
-            i,                                  # [2] Item
-            "",                                 # [3] Search (Empty)
-            best_match,                         # [4] Suggestions
-            ""                                  # [5] Select (Empty)
+            status,
+            descriptions.get(i, ""),
+            i,
+            "",
+            best_match,
+            ""
         ), tags=("missing",))
-    
-    # Process extra images - now in separate tab
+
+        done += 1
+        counter_var.set(f"Building results… {done}/{total}")
+        root.update_idletasks()
+
+    # ---------- EXTRA ----------
     for f in extra:
         path = image_map.get(f.lower(), f"{f}.png")
-        # --- INSERTION ORDER FOR EXTRA IMAGES (No change needed) ---
-        extra_tree.insert("", "end", values=("", # [0] Select
-            f,                                  # [1] Image
-            path                                # [2] Path
+        extra_tree.insert("", "end", values=(
+            "",
+            f,
+            path
         ), tags=("extra",))
-    
+
     tree.tag_configure("ok", background="#d4fcdc")
     tree.tag_configure("missing", background="#fff2cc")
     extra_tree.tag_configure("extra", background="#fcdada")
 
+    counter_var.set(
+        f"Done. Matched: {len(matched)} | Missing: {len(missing)} | Extra: {len(extra)}"
+    )
 # ---------- Auto-rename ----------
 def auto_rename_images():
     if not current_img_folder:
@@ -750,7 +817,6 @@ def auto_rename_images():
             renamed_count += 1
     
     messagebox.showinfo("Done",f"Renamed and resized {renamed_count} images with backup.")
-
 # ---------- Delete Extra Images ----------
 def delete_extra_images():
     if not current_img_folder:

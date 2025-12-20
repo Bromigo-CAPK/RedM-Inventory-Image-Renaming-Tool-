@@ -1,26 +1,32 @@
 # RedM-Inventory-Image-Renaming-Tool-
 Rename Image files using an SQL database file (REDM)
 
-This tool is intended to make life easier when renaming inventory images on mass.
-It compares an SQL Database file with 1 or more image folders and returns exact matches or suggestions based on image file names.
-Exact matches show in green
+This tool is intended to make life easier when renaming inventory images on mass or for finding missing images within a database.
+It compares an exported SQL Database file with 1 or more image folders and returns exact matches or suggestions based on image file names.
+Exact matches show in green, Filter reason given, displays description from SQL, dropdown search bar, and shows suggestions.
+
+Simply search for the image to match the item entry and tick the box for renaming.
 
 Features:
 
-    * Filters
+    * Recursive image scanning
 
-	* Suggestions
+	* Item name & description display
+	
+	* Analysis filters
+
+	* Match detection & suggestions
     
-	* Search Images
+	* Dropdown Search bar
     
-	* Show images on hover
-    
-	* Rename and save image files
+	* Image preview on hover
+
+	* Batch rename after confirmation
     
 How to use ths tool:
 
 
-	* Using a clean folder export the sql you wish to use from your redm server.
+	* Using a clean folder export the SQL you wish to use from your RedM server.
     
 	* Make a copy of the images that are currently matching (that you wish to keep from vorp inventory)
     
@@ -46,4 +52,17 @@ Select images & Rename:
     
 	* Rename the selected rows when finished
     
-    
+UPDATE:
+
+	* Update 1.01
+
+		- Counter in lower left corner
+		
+TO-DO & KNOWEN BUGS: 
+
+	* Saves backups more than once
+	
+	* Unstable when Analyzing (can crash when interacting with the app while analyzing)
+	
+	* 'Select Matched' tab not working
+	

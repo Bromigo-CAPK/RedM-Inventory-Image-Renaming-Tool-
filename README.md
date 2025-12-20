@@ -2,7 +2,9 @@
 Rename Image files using an SQL database file (REDM)
 
 This tool is intended to make life easier when renaming inventory images on mass or for finding missing images within a database.
+
 It compares an exported SQL Database file with 1 or more image folders and returns exact matches or suggestions based on image file names.
+
 Exact matches show in green, Filter reason given, displays description from SQL, dropdown search bar, and shows suggestions.
 
 Simply search for the image to match the item entry and tick the box for renaming.
@@ -16,7 +18,9 @@ Features:
 	* Analysis filters
 
 	* Match detection & suggestions
-    
+
+	* Matches are Highlighted
+	
 	* Dropdown Search bar
     
 	* Image preview on hover
@@ -44,21 +48,21 @@ Run the Tool:
     
 	* Analyze
 
-Select images & Rename:
+Select Images & Rename:
     
 	* Using the suggestions and/or drop down menu select the images you wish to use
     
 	* Toggle Select the rows you wish to rename (✔)
     
 	* Rename the selected rows when finished
-    
-UPDATE:
+
+Updates:
 
 	* Update 1.01
 
 		- Counter in lower left corner
 		
-TO-DO & KNOWEN BUGS: 
+To-Do & Knowen Bugs: 
 
 	* Saves backups more than once
 	

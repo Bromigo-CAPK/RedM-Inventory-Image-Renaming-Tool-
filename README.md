@@ -64,11 +64,15 @@ Updates:
 	* Update 1.02 21/12/25
 
 		- Button Fix
-		
-		- Rename/Backup Folder fix
 
-		- Added Backup option (good for removing images from image pack)
+		- Highlight "Blue" renamed entries
 		
+		- Highlight "Green" Matches (Check they are correct before renaming)
+		
+		- Added Backup option (good for removing images from image pack)
+
+		- Rename/Backup Folder fix
+				
 To-Do & Knowen Bugs: 
 	
 	* Unstable when Analyzing (can crash when interacting with the app while analyzing)

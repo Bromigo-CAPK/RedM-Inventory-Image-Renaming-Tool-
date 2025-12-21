@@ -1,11 +1,11 @@
-""" 
+"""
         ============================================================
         RATBAG DEV 2025                              SK-CAPK.DEV
         ------------------------------------------------------------
         Ratbags SQL-Image Rename Tool 
-        Version:       1.01
+        Version:       1.02
         Released:      18/12/2025
-        Last Update:   20/12/2025
+        Last Update:   21/12/2025
 
         Author:        Bromigo-CAPK@github
         Contributions: Bromigo-CAPK@github
@@ -19,7 +19,7 @@
         database-driven systems.
 
         This project is intended as an opensource template.
-        Feel free to modify, extend, or add custom filters.
+        Feel free to modify, extend, or add custom filters/settings.
 
         FEATURES:
             • Recursive image scanning
@@ -86,10 +86,20 @@ def parse_sql_items(sql_path):
 def analyze(sql_items, image_folder):
     image_files = []
     image_map = {}
+
+    exclude_dirs = {
+        #"backup",
+        "old_images_backup",
+        #"new_rename_output"
+    }
+
     for root_dir, dirs, files in os.walk(image_folder):
+        # prevent walking into excluded folders
+        dirs[:] = [d for d in dirs if d.lower() not in exclude_dirs]
+
         for f in files:
-            if f.lower().endswith(('.png','.jpg','.jpeg','.webp','.bmp')):
-                rel_path = os.path.relpath(os.path.join(root_dir,f), image_folder)
+            if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp', '.bmp')):
+                rel_path = os.path.relpath(os.path.join(root_dir, f), image_folder)
                 name_only = os.path.splitext(f)[0]
                 image_files.append(name_only)
                 image_map[name_only.lower()] = rel_path
@@ -468,20 +478,23 @@ def toggle_extra_select_all():
             extra_selected_rows[row_id] = True
 
 def select_by_status(status_type):
-    """Select items based on status type (Missing or Matched)"""
+    """Select items based on highlight/tag (green=ok only), or missing."""
     for row_id in tree.get_children():
-        values = tree.item(row_id)['values']
-        status = values[3]
-        
-        if status_type == "Missing":
-            if "Missing" in status or "Suggested" in status:
+        tags = tree.item(row_id).get("tags", ())
+        status_val = tree.item(row_id).get("values", [""])[0]  # Status column
+
+        if status_type == "Matched":
+            # ONLY green highlighted lines
+            if "ok" in tags:
                 tree.set(row_id, "Select", "✔")
                 selected_rows[row_id] = True
             else:
                 tree.set(row_id, "Select", "")
                 selected_rows[row_id] = False
-        elif status_type == "Matched":
-            if "match" in status.lower() and "Missing" not in status:
+
+        elif status_type == "Missing":
+            # Keep your old logic OR use the tag if you prefer
+            if "missing" in tags or ("Missing" in str(status_val)) or ("Suggested" in str(status_val)):
                 tree.set(row_id, "Select", "✔")
                 selected_rows[row_id] = True
             else:
@@ -639,7 +652,7 @@ def update_suggestions_dropdown(row_id, search_term):
         return
     
     values = tree.item(row_id)["values"]
-    item_name = values[1]
+    item_name = values[2]
     
     suggestions, match_reasons = suggest_match(item_name, image_files_all)
     
@@ -710,6 +723,17 @@ def run_analysis():
     root.update_idletasks()
     # ---------------------------------
 
+
+    # ---------- RENAMED STATUS (filesystem truth) ----------
+    # If {item}.png exists in old_images_backup, treat as already renamed.
+    renamed_folder = os.path.join(current_img_folder, "new_rename_output")
+    renamed_items = set()
+    if os.path.isdir(renamed_folder):
+        for fn in os.listdir(renamed_folder):
+            if fn.lower().endswith(".png"):
+                renamed_items.add(os.path.splitext(fn)[0].lower())
+    # -------------------------------------------------------
+
     claimed_images_lower = set()
 
     # ---------- MATCHED ----------
@@ -718,7 +742,8 @@ def run_analysis():
         if i_lower in image_map:
             claimed_images_lower.add(i_lower)
 
-        status = "Exact match"
+        # Status: prefer filesystem "Renamed" over analysis result
+        status = "Renamed ✓" if i.lower() in renamed_items else "Exact match"
         reasons = []
         if ignore_underscore_var.get() and ("_" in i or "-" in i):
             for img_name_lower in image_map:
@@ -729,6 +754,8 @@ def run_analysis():
         if reasons:
             status = f"Matched: {', '.join(reasons)}"
 
+        row_tag = "renamed" if i.lower() in renamed_items else "ok"
+
         tree.insert("", "end", values=(
             status,
             descriptions.get(i, ""),
@@ -736,7 +763,7 @@ def run_analysis():
             "",
             i,
             ""
-        ), tags=("ok",))
+        ), tags=(row_tag,))
 
         done += 1
         counter_var.set(f"Building results… {done}/{total}")
@@ -752,10 +779,19 @@ def run_analysis():
         suggestions, match_reasons = suggest_match(i, available_images_for_suggestion)
 
         best_match = suggestions[0] if suggestions else "None"
-        if best_match != "None" and best_match in match_reasons:
+        # If already renamed (exists in new_rename_output), mark as renamed
+        if i.lower() in renamed_items:
+            status = "Renamed ✓"
+        
+        # Status: filesystem "Renamed" overrides suggestion/missing
+        if i.lower() in renamed_items:
+            status = "Renamed ✓"
+        elif best_match != "None" and best_match in match_reasons:
             status = f"Suggested: {', '.join(match_reasons[best_match])}"
         else:
             status = "Missing Image"
+
+        row_tag = "renamed" if i.lower() in renamed_items else "missing"
 
         tree.insert("", "end", values=(
             status,
@@ -764,7 +800,7 @@ def run_analysis():
             "",
             best_match,
             ""
-        ), tags=("missing",))
+        ), tags=(row_tag,))
 
         done += 1
         counter_var.set(f"Building results… {done}/{total}")
@@ -781,42 +817,80 @@ def run_analysis():
 
     tree.tag_configure("ok", background="#d4fcdc")
     tree.tag_configure("missing", background="#fff2cc")
+    tree.tag_configure("renamed", background="#cce5ff")
     extra_tree.tag_configure("extra", background="#fcdada")
 
     counter_var.set(
         f"Done. Matched: {len(matched)} | Missing: {len(missing)} | Extra: {len(extra)}"
     )
 # ---------- Auto-rename ----------
+# ---------- Auto-rename ----------
 def auto_rename_images():
     if not current_img_folder:
         messagebox.showwarning("No folder","Please select an image folder first.")
         return
-    backup_folder = os.path.join(current_img_folder,"backup")
-    os.makedirs(backup_folder, exist_ok=True)
+
+    rename_backup = os.path.join(current_img_folder, "old_images_backup")
+    output_folder = os.path.join(current_img_folder, "new_rename_output")
+
+    os.makedirs(rename_backup, exist_ok=True)
+    os.makedirs(output_folder, exist_ok=True)
+
     renamed_count = 0
-    
+
     for row_id in tree.get_children():
-        if selected_rows.get(row_id,False):
-            values = tree.item(row_id)['values']
-            sql_item = values[2]
-            suggestion = values[4]  # Updated column index
-            if not suggestion or suggestion=="None":
-                continue
-            orig_path = os.path.join(current_img_folder, image_map.get(suggestion.lower(), f"{suggestion}.png"))
-            new_path = os.path.join(current_img_folder, f"{sql_item}.png")
-            if not os.path.isfile(orig_path):
-                continue
-            backup_path = os.path.join(backup_folder, os.path.basename(orig_path))
-            if not os.path.isfile(backup_path):
-                os.rename(orig_path, backup_path)
-            else:
-                os.remove(orig_path)
-            img = Image.open(backup_path)
-            img = img.resize((96,96),Image.LANCZOS)
-            img.save(new_path)
-            renamed_count += 1
-    
-    messagebox.showinfo("Done",f"Renamed and resized {renamed_count} images with backup.")
+        if not selected_rows.get(row_id, False):
+            continue
+
+        values = tree.item(row_id)['values']
+        sql_item = values[2]
+        suggestion = values[4]
+
+        if not suggestion or suggestion == "None":
+            continue
+
+        rel_path = image_map.get(suggestion.lower())
+        if not rel_path:
+            continue
+
+        orig_path = os.path.join(current_img_folder, rel_path)
+        if not os.path.isfile(orig_path):
+            continue
+
+        # Move original → rename_backup
+        backup_path = os.path.join(rename_backup, os.path.basename(orig_path))
+        if not os.path.exists(backup_path):
+            os.rename(orig_path, backup_path)
+        else:
+            os.remove(orig_path)
+
+        # Save final output → output
+        new_path = os.path.join(output_folder, f"{sql_item}.png")
+        img = Image.open(backup_path)
+        img = img.resize((96, 96), Image.LANCZOS)
+        img.save(new_path)
+
+        renamed_count += 1
+
+        # Update UI status in-place (no full rescan)
+        try:
+            tree.set(row_id, "Status", "Renamed ✓")
+            tree.item(row_id, tags=("renamed",))
+            tree.set(row_id, "Select", "")
+            selected_rows[row_id] = False
+        except Exception:
+            pass
+
+    messagebox.showinfo(
+        "Done",
+        f"Renamed and resized {renamed_count} images.\n"
+        f"Output → /new_rename_output\n"
+        f"Backed up originals → /old_images_backup"
+    )
+
+    # Refresh statuses in the UI
+    #run_analysis()
+
 # ---------- Delete Extra Images ----------
 def delete_extra_images():
     if not current_img_folder:
@@ -837,7 +911,7 @@ def delete_extra_images():
     if not messagebox.askyesno("Confirm Delete", f"Delete {len(to_delete)} selected images?\n\nThey will be moved to the backup folder."):
         return
     
-    backup_folder = os.path.join(current_img_folder, "backup")
+    backup_folder = os.path.join(current_img_folder, "old_images_backup")
     os.makedirs(backup_folder, exist_ok=True)
     deleted_count = 0
     
@@ -852,6 +926,4 @@ def delete_extra_images():
                 print(f"Error deleting {img_name}: {e}")
     
     messagebox.showinfo("Done", f"Moved {deleted_count} images to backup folder.")
-    run_analysis()  # Refresh the view
-
 root.mainloop()

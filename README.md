@@ -29,7 +29,6 @@ Features:
     
 How to use ths tool:
 
-
 	* Using a clean folder export the SQL you wish to use from your RedM server.
     
 	* Make a copy of the images that are currently matching (that you wish to keep from vorp inventory)
@@ -61,12 +60,18 @@ Updates:
 	* Update 1.01
 
 		- Counter in lower left corner
+
+	* Update 1.02
+
+		- Button Fix
+		
+		- Backup/Folder fix
 		
 To-Do & Knowen Bugs: 
-
-	* Saves backups more than once
 	
 	* Unstable when Analyzing (can crash when interacting with the app while analyzing)
-	
-	* 'Select Matched' tab not working
+
+	* Add settings to filters tab
+
+	* Options for backups and renaming
 	

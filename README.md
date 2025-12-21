@@ -57,21 +57,20 @@ Select Images & Rename:
 
 Updates:
 
-	* Update 1.01
+	* Update 1.01 - 20/12/25
 
 		- Counter in lower left corner
 
-	* Update 1.02
+	* Update 1.02 21/12/25
 
 		- Button Fix
 		
-		- Backup/Folder fix
+		- Rename/Backup Folder fix
+
+		- Added Backup option (good for removing images from image pack)
 		
 To-Do & Knowen Bugs: 
 	
 	* Unstable when Analyzing (can crash when interacting with the app while analyzing)
 
-	* Add settings to filters tab
-
-	* Options for backups and renaming
-	
+	* Add more settings to filters tab	

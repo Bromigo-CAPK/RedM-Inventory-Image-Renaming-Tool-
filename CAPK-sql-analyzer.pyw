@@ -129,12 +129,13 @@ preview_window = None
 preview_label = None
 
 # ---------- Filters Variables ----------
-ignore_underscore_var = tk.BooleanVar(value=True)
+ignore_underscore_var = tk.BooleanVar(value=False)
 ignore_order_var = tk.BooleanVar(value=False)
 use_keyword_var = tk.BooleanVar(value=False)
 case_sensitive_var = tk.BooleanVar(value=False)
-ignore_double_letters_var = tk.BooleanVar(value=True)
+ignore_double_letters_var = tk.BooleanVar(value=False)
 keywords_var = tk.StringVar(value="consumable,tool,item,equipment")
+backup_enabled_var = tk.BooleanVar(value=False)  # Backup originals (default OFF)
 
 # ---------- Notebook Tabs ----------
 notebook = ttk.Notebook(root)
@@ -157,6 +158,18 @@ ttk.Checkbutton(filters_tab, text="Partial match / keywords", variable=use_keywo
 ttk.Checkbutton(filters_tab, text="Case Sensitive", variable=case_sensitive_var).pack(anchor="w", padx=20)
 ttk.Label(filters_tab, text="Keywords (comma-separated):").pack(anchor="w", padx=10, pady=5)
 ttk.Entry(filters_tab, textvariable=keywords_var, width=50).pack(anchor="w", padx=20)
+
+
+ttk.Separator(filters_tab, orient="horizontal").pack(fill="x", padx=10, pady=10)
+
+ttk.Label(filters_tab, text="Rename Options:", font=("Arial", 10, "bold")).pack(anchor="w", padx=10, pady=(0, 5))
+ttk.Checkbutton(
+    filters_tab,
+    text="Backup originals (move to /old_images_backup)",
+    variable=backup_enabled_var
+).pack(anchor="w", padx=20)
+
+
 
 # ---------- Analyzer Tab ----------
 frame = ttk.Frame(analyzer_tab, padding=10)
@@ -823,7 +836,7 @@ def run_analysis():
     counter_var.set(
         f"Done. Matched: {len(matched)} | Missing: {len(missing)} | Extra: {len(extra)}"
     )
-# ---------- Auto-rename ----------
+
 # ---------- Auto-rename ----------
 def auto_rename_images():
     if not current_img_folder:
@@ -833,7 +846,8 @@ def auto_rename_images():
     rename_backup = os.path.join(current_img_folder, "old_images_backup")
     output_folder = os.path.join(current_img_folder, "new_rename_output")
 
-    os.makedirs(rename_backup, exist_ok=True)
+    if backup_enabled_var.get():
+        os.makedirs(rename_backup, exist_ok=True)
     os.makedirs(output_folder, exist_ok=True)
 
     renamed_count = 0
@@ -857,39 +871,52 @@ def auto_rename_images():
         if not os.path.isfile(orig_path):
             continue
 
-        # Move original → rename_backup
-        backup_path = os.path.join(rename_backup, os.path.basename(orig_path))
-        if not os.path.exists(backup_path):
-            os.rename(orig_path, backup_path)
-        else:
-            os.remove(orig_path)
+        # --------------------------------------------------
+        # BACKUP LOGIC (simple + explicit)
+        # --------------------------------------------------
+        if backup_enabled_var.get():
+            backup_path = os.path.join(rename_backup, os.path.basename(orig_path))
 
-        # Save final output → output
+            # version backup if needed
+            if os.path.exists(backup_path):
+                base, ext = os.path.splitext(os.path.basename(orig_path))
+                n = 1
+                while True:
+                    candidate = os.path.join(rename_backup, f"{base}_{n:03d}{ext}")
+                    if not os.path.exists(candidate):
+                        backup_path = candidate
+                        break
+                    n += 1
+
+            os.rename(orig_path, backup_path)
+            source_for_resize = backup_path
+        else:
+            # No backup: read original in-place
+            source_for_resize = orig_path
+
+        # --------------------------------------------------
+        # Save final output → output folder
+        # --------------------------------------------------
         new_path = os.path.join(output_folder, f"{sql_item}.png")
-        img = Image.open(backup_path)
+        img = Image.open(source_for_resize)
         img = img.resize((96, 96), Image.LANCZOS)
         img.save(new_path)
 
         renamed_count += 1
 
-        # Update UI status in-place (no full rescan)
-        try:
-            tree.set(row_id, "Status", "Renamed ✓")
-            tree.item(row_id, tags=("renamed",))
-            tree.set(row_id, "Select", "")
-            selected_rows[row_id] = False
-        except Exception:
-            pass
+        # Update UI status in-place (NO rescan)
+        tree.set(row_id, "Status", "Renamed ✓")
+        tree.item(row_id, tags=("renamed",))
+        tree.set(row_id, "Select", "")
+        selected_rows[row_id] = False
 
     messagebox.showinfo(
         "Done",
         f"Renamed and resized {renamed_count} images.\n"
         f"Output → /new_rename_output\n"
-        f"Backed up originals → /old_images_backup"
+        + ("Backed up originals → /old_images_backup" if backup_enabled_var.get() else "Originals left untouched")
     )
 
-    # Refresh statuses in the UI
-    #run_analysis()
 
 # ---------- Delete Extra Images ----------
 def delete_extra_images():
